@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LinkCast">
+<meta name="theme-color" content="#0e1122">
+<title>LinkCast</title>
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<style>html,body{margin:0;height:100%;background:#0e1122;color:#a4aad7;font:15px system-ui,sans-serif}p{margin:40vh 20px 0;text-align:center}</style>
+</head>
+<body>
+<p id="msg"></p>
+<script>
+// Opens the page: the key comes from the link (after the "#", never sent to any server) or from an earlier visit.
+(async () => {
+  const msg = t => document.getElementById('msg').textContent = t;
+  let k = new URLSearchParams(location.hash.slice(1)).get('k');
+  try { if (k) localStorage.setItem('lc.k', k); else k = localStorage.getItem('lc.k'); } catch { }
+  if (!k) { msg('Open the link a friend sent you.'); return; }
+  const raw = Uint8Array.from(atob(k.replace(/-/g, '+').replace(/_/g, '/') + '='), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+  const bin = new Uint8Array(await (await fetch('app.bin', { cache: 'no-cache' })).arrayBuffer());
+  const zipped = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bin.slice(0, 12) }, key, bin.slice(12));
+  const html = await new Response(new Blob([zipped]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  document.open();
+  document.write(html);
+  document.close();
+})().catch(() => document.getElementById('msg').textContent = "This link doesn't open LinkCast: ask your friend for a new one.");
+</script>
+</body>
+</html>
